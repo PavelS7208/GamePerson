@@ -257,6 +257,33 @@ if errors.As(err, &bpErr) {
 }
 ```
 
+### Использование промежуточного слоя (DTO) для сериализации сложной структуры персонажа
+```go
+type PersonDTO struct {
+	Name       string     `json:"name" xml:"Name" yaml:"name"`
+	Type       PersonType `json:"type" xml:"Type" yaml:"type"`
+	Health     uint32     `json:"health" xml:"Health" yaml:"health"`
+	Mana       uint32     `json:"mana" xml:"Mana" yaml:"mana"`
+	Level      uint32     `json:"level" xml:"Level" yaml:"level"`
+	Gold       uint32     `json:"gold" xml:"Gold" yaml:"gold"`
+	Respect    uint32     `json:"respect" xml:"Respect" yaml:"respect"`
+	Strength   uint32     `json:"strength" xml:"Strength" yaml:"strength"`
+	Experience uint32     `json:"experience" xml:"Experience" yaml:"experience"`
+	HasHouse   bool       `json:"has_house" xml:"HasHouse" yaml:"has_house"`
+	HasWeapon  bool       `json:"has_weapon" xml:"HasWeapon" yaml:"has_weapon"`
+	HasFamily  bool       `json:"has_family" xml:"HasFamily" yaml:"has_family"`
+	X          int32      `json:"x" xml:"X" yaml:"x"`
+	Y          int32      `json:"y" xml:"Y" yaml:"y"`
+	Z          int32      `json:"z" xml:"Z" yaml:"z"`
+}
+
+// ToDTO преобразует Person в PersonDTO
+func ToDTO(p Person) PersonDTO 
+
+// FromDTO создает Person из PersonDTO
+func FromDTO(dto PersonDTO) (Person, error)
+```
+
 ---
 
 ## 📊 Результаты
