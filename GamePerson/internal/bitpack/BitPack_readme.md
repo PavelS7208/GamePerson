@@ -4,72 +4,13 @@
 
 ## Содержание
 
-- [Ключевые особенности](#ключевые-особенности)
-- [Быстрый старт](#быстрый-старт)
 - [Архитектура](#архитектура)
-  - [Базовые типы](#базовые-типы)
-  - [Типы битовых полей](#типы-битовых-полей)
-- [API для работы с байтовыми срезами](#api-для-работы-с-байтовыми-срезами)
-  - [Generic функции](#generic-функции)
-  - [Checked vs Unchecked операции](#checked-vs-unchecked-операции)
-- [Продвинутые сценарии](#продвинутые-сценарии)
-  - [Работа со знаковыми числами](#работа-со-знаковыми-числами)
-  - [Валидация и безопасность](#валидация-и-безопасность)
+- [API для работы](#api-для-работы)
+- [Сценарии работы](#сценарии-работы)
 - [Обработка ошибок](#обработка-ошибок)
-- [Лучшие практики](#лучшие-практики)
 - [Конкурентность](#конкурентность)
+- [Примеры использования](#примеры-использования)
 
-## Ключевые особенности
-
-✅ **Типобезопасность** — строгая типизация битовых полей с валидацией на этапе конфигурации  
-✅ **Корректная работа со знаковыми числами** — автоматическое знаковое расширение при извлечении  
-✅ **Иммутабельность** — все операции возвращают новые значения  
-✅ **Нулевые аллокации** — все операции работают с примитивными типами без динамической памяти  
-✅ **Гибкая валидация** — контроль диапазонов значений на этапе записи  
-✅ **Поддержка статических конфигураций** — `Must*` конструкторы для проверенных на этапе разработки сценариев  
-✅ **Работа с произвольными срезами байтов** — утилиты для энкодинга/декодинга в `[]byte`  
-✅ **Generic API** — типобезопасная работа с различными типами целых чисел  
-✅ **Структурированная обработка ошибок** — типизированные ошибки с поддержкой `errors.Is()`
-
-## Быстрый старт
-
-```go
-package main
-
-import (
-	"fmt"
-	"bitpack"
-)
-
-func main() {
-	// 1. Определяем битовые поля для компактной структуры данных
-	// Пример: сетевой пакет с флагами и метаданными
-	version   := bitpack.MustNewUIntBitField(0, 3, 15)      // 4 бита: версия (0-15)
-	priority  := bitpack.MustNewUIntBitField(4, 6, 7)       // 3 бита: приоритет (0-7)
-	encrypted := bitpack.MustNewBoolBitField(7)             // 1 бит: флаг шифрования
-	sequence  := bitpack.MustNewUIntBitField(8, 23, 65535)  // 16 бит: номер последовательности
-
-	// 2. Создаём пустой битсет
-	var packet bitpack.BitSet64
-
-	// 3. Записываем значения с автоматической валидацией
-	packet, _ = version.Update(packet, 4)
-	packet, _ = priority.Update(packet, 3)
-	packet    = encrypted.Set(packet) // Устанавливаем флаг
-	packet, _ = sequence.Update(packet, 12345)
-
-	// 4. Извлекаем значения
-	fmt.Printf("Версия: %d\n", version.Get(packet))           // 4
-	fmt.Printf("Приоритет: %d\n", priority.Get(packet))       // 3
-	fmt.Printf("Зашифрован: %v\n", encrypted.Get(packet))     // true
-	fmt.Printf("Последовательность: %d\n", sequence.Get(packet)) // 12345
-
-	// 5. Работа со знаковыми числами (температура от -128 до +127 в 8 битах)
-	tempField := bitpack.MustNewIntBitField(24, 31, -128, 127)
-	packet, _ = tempField.Update(packet, -5)
-	fmt.Printf("Температура: %d°C\n", tempField.Get(packet)) // -5
-}
-```
 
 ## Архитектура
 
@@ -192,13 +133,13 @@ bitset = flag.Clear(bitset)  // Установить в false
 bitset = flag.Toggle(bitset) // Инвертировать
 ```
 
-## API для работы с байтовыми срезами
+## API для работы
 
-Библиотека предоставляет удобный API для работы с данными, упакованными в байтовые срезы.
+Библиотека предоставляет методы для работы с данными, упакованными в байтовые срезы.
 
 ### Generic функции
 
-Современный API использует generic-функции для типобезопасной работы с различными типами:
+generic-функции для работы с различными типами:
 
 ```go
 // Чтение беззнаковых значений
@@ -248,13 +189,8 @@ temp := bitpack.GetIntFieldAs[int32](packet, tempField) // -250
 #### Checked (с валидацией)
 
 **Проверки:**
-- ✅ Длина slice (`len(packed) > 0` и `len(packed) <= 8`)
-- ✅ Диапазон значения (соответствие `Min`/`Max` или `Max` для беззнаковых)
-
-**Когда использовать:**
-- Пользовательский ввод
-- Внешние данные (сеть, файлы)
-- Любые ненадежные источники
+- Длина slice (`len(packed) > 0` и `len(packed) <= 8`)
+- Диапазон значения (соответствие `Min`/`Max` или `Max` для беззнаковых)
 
 **Пример:**
 ```go
@@ -268,17 +204,13 @@ if err != nil {
 #### Unchecked (без валидации)
 
 **Что пропускается:**
-- ❌ Проверка длины slice
-- ❌ Проверка диапазона значения
+- Проверка длины slice
+- Проверка диапазона значения
 
 **Когда использовать:**
 - Данные уже валидированы на уровне бизнес-логики
 - Batch обработка больших объемов данных
 - Критичные по производительности участки
-
-**ВАЖНО:** Вызывающий код ОБЯЗАН гарантировать:
-- `len(packed) > 0` и `len(packed) <= 8`
-- Значение находится в допустимом диапазоне
 
 **Пример:**
 ```go
@@ -295,41 +227,9 @@ func (p *Person) SetHealth(health uint32) error {
 }
 ```
 
-**Разница в производительности:**
-```go
-// Benchmark: Checked vs Unchecked
-BenchmarkSetUIntFieldAs-8        50000000    25.3 ns/op
-BenchmarkSetUIntFieldUncheckedAs-8  100000000    11.7 ns/op
-
-// Unchecked в ~2x быстрее за счет пропуска проверок
-```
-
-## Продвинутые сценарии
-
-### Работа со знаковыми числами
-
-BitPack корректно обрабатывает знаковые числа в дополнительном коде:
-
-```go
-// Поле для температуры: от -50°C до +50°C в 7 битах
-tempField := bitpack.MustNewIntBitField(0, 6, -50, 50)
-
-var data bitpack.BitSet64
-
-// Запись отрицательной температуры
-data, _ = tempField.Update(data, -25)
-
-// Извлечение с корректным знаковым расширением
-temp := tempField.Get(data) // -25 (int64)
-
-// Битовое представление
-// -25 в 7 битах = 0b1100111 (дополнительный код)
-// При извлечении автоматически расширяется до int64
-```
+## Сценарии работы
 
 ### Валидация и безопасность
-
-Библиотека проводит валидацию на двух уровнях:
 
 #### 1. Валидация конфигурации (при создании поля)
 
@@ -366,9 +266,41 @@ err = bitpack.SetUIntFieldAs[uint8](packet, field, 5)
 // err: "packed slice too large: 10 bytes (max 8)"
 ```
 
-## Обработка ошибок
 
-Библиотека использует структурированные ошибки с поддержкой `errors.Is()` для удобной обработки:
+#### 3. Использование Must* конструкторов для статических конфигураций
+
+Это переносит валидацию на этап компиляции/инициализации для глобальных констант:
+
+```go
+// В глобальных переменных или константах структуры:
+var (
+    VersionField   = bitpack.MustNewUIntBitField(0, 3, 15)
+    PriorityField  = bitpack.MustNewUIntBitField(4, 6, 7)
+    EncryptedFlag  = bitpack.MustNewBoolBitField(7)
+)
+
+// Если конфигурация невалидна - программа упадет при запуске
+// Это ЖЕЛАЕМОЕ поведение для статических конфигураций!
+```
+
+#### 4. Использование PackedN типов
+
+Это предотвращает ошибки работы с неправильной длиной среза:
+
+```go
+var buffer bitpack.Packed32 // Типобезопасный 4-байтный контейнер
+
+// Запись
+bitpack.PackBytes(buffer[:], bitset)
+
+// Чтение
+bitset := bitpack.UnpackBytes(buffer[:])
+```
+
+
+
+
+## Обработка ошибок
 
 ### Типы ошибок
 
@@ -385,22 +317,7 @@ const (
 )
 ```
 
-### Sentinel errors
-
-```go
-var (
-    ErrStartAfterEnd      = &Error{Kind: KindStartAfterEnd}
-    ErrEndOutOfRange      = &Error{Kind: KindEndOutOfRange}
-    ErrValueOverflow      = &Error{Kind: KindValueOverflow}
-    ErrValueUnderflow     = &Error{Kind: KindValueUnderflow}
-    ErrValueRangeInverted = &Error{Kind: KindValueRangeInverted}
-    ErrPositionOutOfRange = &Error{Kind: KindPositionOutOfRange}
-    ErrSliceEmpty         = &Error{Kind: KindSliceEmpty}
-    ErrSliceTooLarge      = &Error{Kind: KindSliceTooLarge}
-)
-```
-
-### Примеры обработки
+### Примеры обработки ошибок
 
 ```go
 // Проверка типа ошибки
@@ -423,96 +340,9 @@ if errors.As(err, &bpErr) {
 }
 ```
 
-## Лучшие практики
+### Проверка на непересечение полей
 
-### 1. Использование Must* конструкторов для статических конфигураций
-
-Это переносит валидацию на этап компиляции/инициализации:
-
-```go
-// В глобальных переменных или константах структуры:
-var (
-    VersionField   = bitpack.MustNewUIntBitField(0, 3, 15)
-    PriorityField  = bitpack.MustNewUIntBitField(4, 6, 7)
-    EncryptedFlag  = bitpack.MustNewBoolBitField(7)
-)
-
-// Если конфигурация невалидна - программа упадет при запуске
-// Это ЖЕЛАЕМОЕ поведение для статических конфигураций!
-```
-
-### 2. Группировка полей в логические структуры
-
-Позволяет визуально проверять корректность битовых настроек:
-
-```go
-type PacketHeader struct {
-    Version   bitpack.UIntBitField
-    Priority  bitpack.UIntBitField
-    Encrypted bitpack.BoolBitField
-    Sequence  bitpack.UIntBitField
-}
-
-func NewPacketHeader() PacketHeader {
-    return PacketHeader{
-        Version:   bitpack.MustNewUIntBitField(0, 3, 15),
-        Priority:  bitpack.MustNewUIntBitField(4, 6, 7),
-        Encrypted: bitpack.MustNewBoolBitField(7),
-        Sequence:  bitpack.MustNewUIntBitField(8, 23, 65535),
-    }
-}
-```
-
-### 3. Для динамических конфигураций — проверка на ошибки
-
-```go
-field, err := bitpack.NewUIntBitField(start, end, maxValue)
-if err != nil {
-    return fmt.Errorf("invalid field config: %w", err)
-}
-```
-
-### 4. Использование PackedN типов для безопасной работы
-
-Это предотвращает ошибки работы с неправильной длиной среза:
-
-```go
-var buffer bitpack.Packed32 // Типобезопасный 4-байтный контейнер
-
-// Запись
-bitpack.PackBytes(buffer[:], bitset)
-
-// Чтение
-bitset := bitpack.UnpackBytes(buffer[:])
-```
-
-### 5. Выбор между Checked и Unchecked операциями
-
-```go
-// Для внешних данных — всегда Checked
-if err := bitpack.SetUIntFieldAs[uint32](packet, field, userInput); err != nil {
-    return fmt.Errorf("invalid value: %w", err)
-}
-
-// Для внутренних данных с гарантированной корректностью — Unchecked
-// ТОЛЬКО после валидации на бизнес-уровне!
-func (p *Person) SetMana(mana uint32) error {
-    // Бизнес-логика с проверками
-    if mana > MaxMana {
-        return fmt.Errorf("mana exceeds maximum")
-    }
-    
-    // Гарантия валидности → unchecked для производительности
-    bitpack.SetUIntFieldUncheckedAs[uint32](p.packed[:], manaField, mana)
-    return nil
-}
-```
-
-### 6. Проверка на непересечение полей
-
-При проектировании сложных структур с множеством битовых полей критически важно проверять два свойства:
-- **Непересечение** — битовые поля не должны перекрываться
-- **Полное покрытие** — все биты структуры должны быть назначены полям
+При проектировании сложных структур с множеством битовых полей важно проверять **Непересечение** — битовые поля не должны перекрываться в битовом поле.
 
 Рекомендуется добавлять unit-тест, проверяющий корректность раскладки полей:
 
@@ -584,100 +414,15 @@ func TestPacketHeaderLayout(t *testing.T) {
         t.Fatalf("обнаружено %d непокрытых битов из %d", missing, totalBits)
     }
 
-    t.Logf("✅ Все %d бита корректно распределены между %d полями", 
+    t.Logf("Все %d бита корректно распределены между %d полями", 
         totalBits, len(fields))
 }
 ```
 
-### 7. Использование NewIntBitFieldAuto для упрощения
-
-Если нужен полный диапазон значений для заданной ширины:
-
-```go
-// Вместо ручного расчёта диапазона
-field := bitpack.MustNewIntBitField(0, 7, -128, 127)
-
-// Можно использовать автоматический расчёт
-field, err := bitpack.NewIntBitFieldAuto(0, 7) // Автоматически: -128..127
-```
-
 ## Конкурентность
 
-**ВАЖНО:** Операции с одним и тем же `[]byte` slice НЕ являются thread-safe.
+**ВАЖНО:** Операции с полями не являются потоко безопасными. Необходима дополнительная синхронизация.
 
-### Небезопасное использование
-
-```go
-var packet bitpack.Packed48
-
-// ГОНКА! Две горутины пишут в один slice
-go func() {
-    bitpack.SetUIntFieldAs[uint32](packet[:], field1, 42)
-}()
-go func() {
-    bitpack.SetUIntFieldAs[uint32](packet[:], field2, 84)
-}()
-```
-
-### Безопасные паттерны
-
-#### 1. Каждая горутина работает со своим экземпляром
-
-```go
-// ✅ Безопасно
-for i := 0; i < 10; i++ {
-    go func(id int) {
-        var packet bitpack.Packed48 // свой экземпляр
-        bitpack.SetUIntFieldAs[uint32](packet[:], field, uint32(id))
-    }(i)
-}
-```
-
-#### 2. Использование sync.Mutex
-
-```go
-type SafePacket struct {
-    mu     sync.RWMutex
-    packet bitpack.Packed48
-}
-
-func (sp *SafePacket) SetField(field bitpack.UIntBitField, value uint32) error {
-    sp.mu.Lock()
-    defer sp.mu.Unlock()
-    return bitpack.SetUIntFieldAs[uint32](sp.packet[:], field, value)
-}
-
-func (sp *SafePacket) GetField(field bitpack.UIntBitField) uint32 {
-    sp.mu.RLock()
-    defer sp.mu.RUnlock()
-    return bitpack.GetUIntFieldAs[uint32](sp.packet[:], field)
-}
-```
-
-### Тестирование с race detector
-
-```bash
-# Запустить тесты с детектором гонок
-go test -race ./...
-
-# Запустить программу с детектором гонок
-go run -race main.go
-```
-
-## Производительность
-
-- **Нулевые аллокации** — все операции работают с примитивными типами
-- **Кэшированные маски** — битовые маски вычисляются один раз при создании поля
-- **Unchecked операции** — для критичных по производительности участков (~2x быстрее)
-- **Inline-оптимизация** — простые операции inline'ятся компилятором
-
-**Benchmark результаты:**
-```
-BenchmarkSetUIntFieldAs-8           50000000    25.3 ns/op    0 B/op    0 allocs/op
-BenchmarkSetUIntFieldUncheckedAs-8  100000000   11.7 ns/op    0 B/op    0 allocs/op
-BenchmarkIntBitFieldGet-8           2000000000   0.52 ns/op   0 B/op    0 allocs/op
-BenchmarkBoolBitFieldSet-8          2000000000   0.48 ns/op   0 B/op    0 allocs/op
-```
 
 ## Примеры использования
 
