@@ -163,7 +163,7 @@ person, err := person.NewPerson(
 // Расширяемость: добавление новых опций не ломает существующий код
 ```
 
-### 6. **Generic Serialization System**
+### 6. Обобщенная система сериализации на основе дженериков
 
 ```go
 // Универсальный сериализатор для любых сущностей
@@ -172,11 +172,40 @@ type Serializer[E any, D any] struct {
     integrity *entity.IntegrityChecker
 }
 
+// Единый инстанс проверки целостности
+	ic := entity.NewIntegrityChecker()
+
+	// Создаём сериализаторы
+	personSerializer := person.NewSerializer(ic)
+	monsterSerializer := monster.NewSerializer(ic)
+
 // Использование:
+	p, _ := person.NewPerson(
+		person.WithName("BuilderBob"),
+		person.WithType(person.PersonTypeBuilder),
+		person.WithCoordinates(100, 200, 50),
+		person.WithGold(5000),
+	)
+
+	// === Сериализация в JSON ===
+	jsonData, err := personSerializer.ToJSON(p)
+
+     m, _ := monster.NewMonster(
+		monster.WithName("Dragon"),
+		monster.WithCoordinates(500, 600, 100),
+	)
+	
+	// Сериализация монстра
+	monsterJSON, _ := monsterSerializer.ToJSON(m)
+
+	// Десериализация с той же логикой валидации
+	m2, err := monsterSerializer.FromJSON(monsterJSON)
+	
+//  Или так. Дефолтная проверка валидации
 serializer := person.NewSerializer(nil)
-jsonData, _ := serializer.ToJSON(person)
-xmlData, _ := serializer.ToXML(person)
-yamlData, _ := serializer.ToYAML(person)
+jsonData, _ := serializer.ToJSON(p)
+xmlData, _ := serializer.ToXML(p)
+yamlData, _ := serializer.ToYAML(p)
 
 // Десериализация с автоматической валидацией
 restored, err := person.NewFromJSON(jsonData)
