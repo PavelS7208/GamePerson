@@ -291,8 +291,8 @@ GamePerson/
 ├── internal/
 │   ├── bitpack/        #  Библиотека битовых полей
 │   │   ├── bit_field.go         # UInt/Int/BoolBitField
-│   │   ├── bit_field_error.go   # Структурированные ошибки
-│   │   ├── bit_pack.go          # High-level API
+│   │   ├── bit_field_error.go   # Структурированные ошибки библиотеки
+│   │   ├── bit_pack.go          # API для работы с битовыми полями
 │   │   └── types.go             # Базовые типы
 │   └── model/
 │       ├── config/              # Конфигурация лимитов
